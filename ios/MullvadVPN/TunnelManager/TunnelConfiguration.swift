@@ -22,7 +22,15 @@ struct TunnelConfiguration {
         let protocolConfig = NETunnelProviderProtocol()
         protocolConfig.providerBundleIdentifier = ApplicationTarget.packetTunnel.bundleIdentifier
         protocolConfig.serverAddress = ""
-        protocolConfig.includeAllNetworks = includeAllNetworks
+        // IOS16-PATCH: includeAllNetworks (Force all apps / kill switch) доступен только с iOS 17.
+        // На iOS 16 делаем fallback: включение этой опции игнорируется, туннель работает без includeAllNetworks.
+        // История: до тега ios/2026.2 фича была под #if DEBUG и выкл. по умолчанию — повторяем то поведение на iOS 16.
+        if #available(iOS 17, *) {
+            protocolConfig.includeAllNetworks = includeAllNetworks
+        } else {
+            // На iOS 16 includeAllNetworks недоступен — оставляем false (дефолт), чтобы не падать при компиляции.
+            // Пользователь увидит, что "Force all apps" работает иначе/хуже (см. docs).
+        }
         protocolConfig.excludeLocalNetworks = excludeLocalNetworks
 
         let alwaysOnRule = NEOnDemandRuleConnect()
