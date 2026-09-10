@@ -78,11 +78,9 @@ struct AntiCensorshipView: View {
                         }
                     }
                 )
-                .onChange(of: settings.tunnelSettings.wireGuardObfuscation, initial: false) { oldValue, newValue in
-                    // Prevent spamming updates if the same cell is pressed multiple times in a row
-                    if oldValue != newValue {
-                        updateSettings()
-                    }
+                // IOS16-PATCH: onChange(initial:) требует iOS 17. На iOS 16 используем старый синтаксис.
+                .onChange(of: settings.tunnelSettings.wireGuardObfuscation) { newValue in
+                    updateSettings()
                 }
             }
             .padding(.leading, UIMetrics.contentInsets.left)

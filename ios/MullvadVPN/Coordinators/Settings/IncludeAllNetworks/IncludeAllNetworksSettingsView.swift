@@ -160,11 +160,12 @@ struct IncludeAllNetworksSettingsView<ViewModel: IncludeAllNetworksSettingsViewM
                 .padding(.trailing, UIMetrics.contentInsets.right)
             }
         }
-        .onChange(of: viewModel.shouldShowEnableNotificationsAlert, initial: false) { _, showAlert in
+        // IOS16-PATCH: onChange(initial:) требует iOS 17. На iOS 16 fallback на старый API.
+        .onChange(of: viewModel.shouldShowEnableNotificationsAlert) { showAlert in
             guard showAlert else { return }
             showEnableNotificationsAlert()
         }
-        .onChange(of: viewModel.shouldShowReconsiderNotificationsAlert, initial: false) { _, showAlert in
+        .onChange(of: viewModel.shouldShowReconsiderNotificationsAlert) { showAlert in
             guard showAlert else { return }
             showReconsiderNotificationsAlert()
         }
