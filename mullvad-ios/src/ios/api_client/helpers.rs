@@ -1,0 +1,125 @@
+use std::{
+    ffi::{CString, c_char, c_void},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+};
+
+use shadowsocks::crypto::available_ciphers;
+use talpid_types::net::proxy::{Shadowsocks, ShadowsocksCipher, Socks5Remote, SocksAuth};
+
+use super::get_string;
+
+/// Constructs a new IP address from a pointer containing bytes representing an IP address.
+///
+/// SAFETY: `addr` pointer must be non-null, aligned, and point to at least addr_len bytes
+pub(crate) unsafe fn parse_ip_addr(addr: *const u8, addr_len: usize) -> Option<IpAddr> {
+    match addr_len {
+        4 => {
+            // SAFETY: `addr` pointer must be non-null, aligned, and point to at least addr_len bytes
+            let bytes = unsafe { std::slice::from_raw_parts(addr, addr_len) };
+            Some(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]).into())
+        }
+        16 => {
+            // SAFETY: `addr` pointer must be non-null, aligned, and point to at least addr_len bytes
+            let bytes = unsafe { std::slice::from_raw_parts(addr, addr_len) };
+            let mut addr_arr = [0u8; 16];
+            addr_arr.as_mut_slice().copy_from_slice(bytes);
+
+            Some(Ipv6Addr::from(addr_arr).into())
+        }
+        anything_else => {
+            log::error!("Bad IP address length {anything_else}");
+            None
+        }
+    }
+}
+
+/// Converts parameters into a boxed `Shadowsocks` configuration that is safe
+/// to send across the FFI boundary
+///
+/// # SAFETY
+/// `address` must be a pointer to at least `address_len` bytes.
+/// `c_password` and `c_cipher` must be pointers to null terminated strings
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn new_shadowsocks_access_method_setting(
+    address: *const u8,
+    address_len: usize,
+    port: u16,
+    c_password: *const c_char,
+    c_cipher: *const c_char,
+) -> *mut c_void {
+    let endpoint: SocketAddr =
+        // SAFETY: `addr` pointer must be non-null, aligned, and point to at least addr_len bytes
+        if let Some(ip_address) = unsafe { parse_ip_addr(address, address_len) } {
+            SocketAddr::new(ip_address, port)
+        } else {
+            return std::ptr::null_mut();
+        };
+
+    // SAFETY: `c_password` pointer must be a valid C string pointer
+    let password = unsafe { get_string(c_password) };
+    // SAFETY: `c_cipher` pointer must be a valid C string pointer
+    let cipher = unsafe { get_string(c_cipher) };
+    let cipher = ShadowsocksCipher::new(&cipher).unwrap();
+
+    let shadowsocks_configuration = Shadowsocks::new(endpoint, cipher, password);
+
+    Box::into_raw(Box::new(shadowsocks_configuration)) as *mut c_void
+}
+
+/// Converts parameters into a boxed `Socks5Remote` configuration that is safe
+///
+/// to send across the FFI boundary
+///
+/// # SAFETY
+/// `address` must be a pointer to at least `address_len` bytes.
+/// `c_username` and `c_password` must be pointers to null terminated strings, or null
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn new_socks5_access_method_setting(
+    address: *const u8,
+    address_len: usize,
+    port: u16,
+    c_username: *const c_char,
+    c_password: *const c_char,
+) -> *mut c_void {
+    let endpoint: SocketAddr =
+        // SAFETY: caller guarantees that `address` is valid for at least `address_len` bytes
+        if let Some(ip_address) = unsafe { parse_ip_addr(address, address_len) } {
+            SocketAddr::new(ip_address, port)
+        } else {
+            return std::ptr::null_mut();
+        };
+
+    let auth = {
+        if c_username.is_null() || c_password.is_null() {
+            None
+        } else {
+            // SAFETY: The caller must guarantee that `c_username` is a valid C string pointer
+            let username = unsafe { get_string(c_username) };
+            // SAFETY: The caller must guarantee that `c_password` is a valid C string pointer
+            let password = unsafe { get_string(c_password) };
+            SocksAuth::new(username, password).ok()
+        }
+    };
+
+    let socks5_configuration = Socks5Remote { endpoint, auth };
+    Box::into_raw(Box::new(socks5_configuration)) as *mut c_void
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_shadowsocks_chipers() -> *mut libc::c_char {
+    let ciphers_string = available_ciphers().join(",");
+    let ciphers_c_string = CString::new(ciphers_string).unwrap_or_default();
+
+    ciphers_c_string.into_raw()
+}
+
+/// Deallocates a CString returned by the Mullvad API client.
+///
+/// # Safety
+///
+/// `cstr_ptr` must be a pointer to a string allocated by another `mullvad_api` function.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mullvad_api_cstring_drop(cstr_ptr: *mut libc::c_char) {
+    // SAFETY: caller guarantees that `cstr_ptr` is a valid C string pointer
+    let _ = unsafe { CString::from_raw(cstr_ptr) };
+}

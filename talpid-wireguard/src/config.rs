@@ -1,0 +1,198 @@
+use std::net::{Ipv4Addr, Ipv6Addr};
+use talpid_types::net::{GenericTunnelOptions, obfuscation::Obfuscators, wireguard};
+
+/// Name to use for the tunnel device
+#[cfg(target_os = "linux")]
+pub(crate) const MULLVAD_INTERFACE_NAME: &str = "wg0-mullvad";
+
+/// Config required to set up a single WireGuard tunnel
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// Contains tunnel endpoint specific config
+    pub tunnel: wireguard::TunnelConfig,
+    /// Entry peer
+    pub entry_peer: wireguard::PeerConfig,
+    /// Multihop exit peer
+    pub exit_peer: Option<wireguard::PeerConfig>,
+    /// IPv4 gateway
+    pub ipv4_gateway: Ipv4Addr,
+    /// IPv6 gateway
+    pub ipv6_gateway: Option<Ipv6Addr>,
+    /// Maximum transmission unit for the tunnel
+    pub mtu: u16,
+    /// Firewall mark
+    // TODO: Should this be optional? Should it even be configurable?
+    #[cfg(target_os = "linux")]
+    pub fwmark: Option<u32>,
+    /// Enable IPv6 routing rules
+    #[cfg(target_os = "linux")]
+    pub enable_ipv6: bool,
+    /// Obfuscator config to be used for reaching the relay.
+    pub obfuscator_config: Option<Obfuscators>,
+    /// MTU including obfuscation overhead.
+    pub obfuscation_mtu: u16,
+    /// Enable quantum-resistant PSK exchange
+    pub quantum_resistant: bool,
+    /// Enable DAITA
+    pub daita: bool,
+}
+
+/// Configuration errors
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    /// Supplied parameters don't contain a valid tunnel IP
+    #[error("No valid tunnel IP")]
+    InvalidTunnelIpError,
+
+    /// Peer has no valid IPs
+    #[error("Supplied peer has no valid IPs")]
+    InvalidPeerIpError,
+}
+
+impl Config {
+    /// Constructs a Config from parameters
+    pub fn from_parameters(
+        params: &wireguard::TunnelParameters,
+        default_mtu: u16,
+        obfuscation_mtu: u16,
+    ) -> Result<Config, Error> {
+        Self::new(
+            &params.connection,
+            &params.options,
+            &params.generic_options,
+            &params.obfuscation,
+            default_mtu,
+            obfuscation_mtu,
+        )
+    }
+
+    /// Constructs a new Config struct
+    fn new(
+        connection: &wireguard::ConnectionConfig,
+        wg_options: &wireguard::TunnelOptions,
+        generic_options: &GenericTunnelOptions,
+        obfuscator_config: &Option<Obfuscators>,
+        default_mtu: u16,
+        obfuscation_mtu: u16,
+    ) -> Result<Config, Error> {
+        let mut tunnel = connection.tunnel.clone();
+
+        let mtu = wg_options.mtu.unwrap_or(default_mtu);
+
+        if tunnel.addresses.is_empty() {
+            return Err(Error::InvalidTunnelIpError);
+        }
+        tunnel
+            .addresses
+            .retain(|ip| ip.is_ipv4() || generic_options.enable_ipv6);
+
+        let ipv6_gateway = connection
+            .ipv6_gateway
+            .filter(|_opt| generic_options.enable_ipv6);
+
+        let mut config = Config {
+            tunnel,
+            entry_peer: connection.peer.clone(),
+            exit_peer: connection.exit_peer.clone(),
+            ipv4_gateway: connection.ipv4_gateway,
+            ipv6_gateway,
+            mtu,
+            #[cfg(target_os = "linux")]
+            fwmark: connection.fwmark,
+            #[cfg(target_os = "linux")]
+            enable_ipv6: generic_options.enable_ipv6,
+            obfuscator_config: obfuscator_config.to_owned(),
+            obfuscation_mtu,
+            quantum_resistant: wg_options.quantum_resistant,
+            daita: wg_options.daita,
+        };
+
+        for peer in config.peers_mut() {
+            peer.allowed_ips
+                .retain(|ip| ip.is_ipv4() || generic_options.enable_ipv6);
+            if peer.allowed_ips.is_empty() {
+                return Err(Error::InvalidPeerIpError);
+            }
+        }
+
+        Ok(config)
+    }
+
+    /// Derive [crate::obfuscation::ObfuscationSettings] from the current config state.
+    ///
+    /// This is computed on demand so that it always reflects the current
+    /// private key (which may change during ephemeral peer negotiation).
+    pub fn obfuscation_settings(&self) -> Option<crate::obfuscation::ObfuscationSettings> {
+        self.obfuscator_config.as_ref().map(|obfuscator_config| {
+            crate::obfuscation::settings_from_config(
+                self.tunnel.private_key.public_key(),
+                self.entry_peer.public_key.clone(),
+                obfuscator_config,
+                self.obfuscation_mtu,
+            )
+        })
+    }
+
+    /// Return whether the config connects to an exit peer from another remote peer.
+    pub fn is_multihop(&self) -> bool {
+        self.exit_peer.is_some()
+    }
+
+    /// Return the exit peer. `exit_peer` if it is set, otherwise `entry_peer`.
+    pub fn exit_peer(&self) -> &wireguard::PeerConfig {
+        self.exit_peer.as_ref().unwrap_or(&self.entry_peer)
+    }
+
+    /// Return the exit peer. `exit_peer` if it is set, otherwise `entry_peer`.
+    pub fn exit_peer_mut(&mut self) -> &mut wireguard::PeerConfig {
+        self.exit_peer.as_mut().unwrap_or(&mut self.entry_peer)
+    }
+
+    /// Return an iterator over all peers.
+    pub fn peers(&self) -> impl Iterator<Item = &wireguard::PeerConfig> {
+        self.exit_peer
+            .as_ref()
+            .into_iter()
+            .chain(std::iter::once(&self.entry_peer))
+    }
+
+    /// Return a mutable iterator over all peers.
+    pub fn peers_mut(&mut self) -> impl Iterator<Item = &mut wireguard::PeerConfig> {
+        self.exit_peer
+            .as_mut()
+            .into_iter()
+            .chain(std::iter::once(&mut self.entry_peer))
+    }
+
+    /// Return routes for all allowed IPs.
+    pub fn get_tunnel_destinations(&self) -> impl Iterator<Item = ipnetwork::IpNetwork> + '_ {
+        self.peers()
+            .flat_map(|peer| peer.allowed_ips.iter())
+            .cloned()
+    }
+}
+
+/// Replace `0.0.0.0/0`/`::/0` with the gateway IPs.
+/// Used to block traffic to other destinations while connecting on Android.
+#[cfg(target_os = "android")]
+pub(crate) fn patch_allowed_ips(mut config: Config) -> Config {
+    use ipnetwork::IpNetwork;
+    use std::net::IpAddr;
+
+    let gateway_net_v4 = IpNetwork::from(IpAddr::from(config.ipv4_gateway));
+    let gateway_net_v6 = config
+        .ipv6_gateway
+        .map(|net| IpNetwork::from(IpAddr::from(net)));
+    for peer in config.peers_mut() {
+        for allowed_ips in &mut peer.allowed_ips {
+            if allowed_ips.prefix() == 0 {
+                match (allowed_ips.is_ipv4(), gateway_net_v6) {
+                    (true, _) => *allowed_ips = gateway_net_v4,
+                    (_, Some(net)) => *allowed_ips = net,
+                    _ => continue,
+                }
+            }
+        }
+    }
+    config
+}
