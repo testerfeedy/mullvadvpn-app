@@ -18,6 +18,28 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          lfs: false
+
+      - name: 🔍 Step 1b - Verify submodules — START
+        run: |
+          set -euo pipefail
+          echo "=== Submodules status ==="
+          git submodule status || true
+          ls -la ios/wireguard-apple 2>&1 | head -n 30 || echo "wireguard-apple missing!"
+          if [ ! -f "ios/wireguard-apple/Package.swift" ]; then
+            echo "⚠️ wireguard-apple not checked out, trying manual init..."
+            git submodule sync --recursive || true
+            git submodule update --init --recursive ios/wireguard-apple 2>&1 | tail -n 20 || true
+            ls -la ios/wireguard-apple 2>&1 | head -n 30 || true
+          fi
+          if [ ! -f "ios/wireguard-apple/Package.swift" ]; then
+            echo "❌ wireguard-apple still missing after init — trying direct clone"
+            rm -rf ios/wireguard-apple
+            git clone https://github.com/mullvad/wireguard-apple.git ios/wireguard-apple 2>&1 | tail -n 10
+            cd ios/wireguard-apple && git checkout 3cf9a523bb4bdb46fcba08566a8c587de6f6d0b0 2>&1 | tail -n 5
+            ls -la . | head -n 20
+          fi
+          echo "✅ Submodules verified"
 
       - name: 🔍 Step 2 - Env diagnostics — START
         run: |
