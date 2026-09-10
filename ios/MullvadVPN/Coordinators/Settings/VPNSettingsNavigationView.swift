@@ -17,7 +17,8 @@ struct VPNSettingsNavigationView: View {
     let IPOverrideInteractor: IPOverrideInteractor
     let alertPresenter: AlertPresenter
     let navigationController: UINavigationController
-    @Bindable var observableSettings: ObservableVPNSettings
+    // IOS16-PATCH: @Bindable требует iOS 17. На iOS 16 используем @ObservedObject.
+    @ObservedObject var observableSettings: ObservableVPNSettings
     let presentOnlySection: VPNSettingsSection
 
     init(

@@ -19,7 +19,8 @@ struct VPNSettingsView: View {
     let alertPresenter: AlertPresenter
     let navigationController: UINavigationController
 
-    @Bindable var settings: ObservableVPNSettings
+    // IOS16-PATCH: @Bindable требует iOS 17. На iOS 16 используем @ObservedObject.
+    @ObservedObject var settings: ObservableVPNSettings
     @Binding var isQuantumResistanceEnabled: Bool
     @Binding var wireGuardPort: WireGuardPort
     /// When hotlinking settings from a pill in the `ConnectionView`, scroll automatically to the correct section

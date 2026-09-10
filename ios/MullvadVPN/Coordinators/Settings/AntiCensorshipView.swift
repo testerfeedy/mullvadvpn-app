@@ -13,7 +13,8 @@ import SwiftUI
 
 struct AntiCensorshipView: View {
     let settingsInteractor: VPNSettingsInteractor
-    @Bindable var settings: ObservableVPNSettings
+    // IOS16-PATCH: @Bindable требует iOS 17. На iOS 16 используем @ObservedObject.
+    @ObservedObject var settings: ObservableVPNSettings
     let itemFactory = SegmentedListItemFactory()
 
     struct Option: Identifiable {
@@ -91,11 +92,11 @@ struct AntiCensorshipView: View {
                         }
                     }
                 )
-                .onChange(of: settings.tunnelSettings.wireGuardObfuscation, initial: false) { oldValue, newValue in
+                // IOS16-PATCH: onChange(initial:) требует iOS 17. На iOS 16 используем старый синтаксис без initial.
+                .onChange(of: settings.tunnelSettings.wireGuardObfuscation) { newValue in
                     // Prevent spamming updates if the same cell is pressed multiple times in a row
-                    if oldValue != newValue {
-                        updateSettings()
-                    }
+                    // На iOS 16 oldValue недоступен, берём напрямую.
+                    updateSettings()
                 }
             }
             .padding(.leading, UIMetrics.contentInsets.left)
