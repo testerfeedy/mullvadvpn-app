@@ -62,19 +62,26 @@ jobs:
         run: |
           set -euo pipefail
           echo "Selecting suitable Xcode..."
-          # macos-14 image includes Xcode 15.4 and 16.x. We need Xcode 15.4+ for iOS 16/17 builds with Rust.
-          # Try to prefer Xcode 15.4 if available, otherwise keep default.
-          if [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-            echo "→ Using Xcode 15.4"
-          elif [ -d "/Applications/Xcode_16.4.app" ]; then
+          # Swift 6 (swift-log 1.8 с tools 6.0) требует Xcode 16+. На macos-14 есть 15.4 и 16.x — берём 16.x.
+          ls /Applications/Xcode*.app 2>&1 | head -n 20 || true
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
             echo "→ Using Xcode 16.4"
+          elif [ -d "/Applications/Xcode_16.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+            echo "→ Using Xcode 16.2"
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+            echo "→ Using Xcode 16.1"
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+            echo "→ Using Xcode 16.0"
           else
-            echo "→ Using default Xcode at $(xcode-select -p)"
+            echo "→ Using default Xcode at $(xcode-select -p) (expected 16.x for Swift 6)"
           fi
           xcodebuild -version
-          echo "✅ Xcode selection done (requires verification on first CI run — see summary block)"
+          swift --version || true
+          echo "✅ Xcode selection done"
 
       - name: 📦 Step 4 - Install dependencies (Rust, Go, protobuf, ripgrep) — START
         run: |
