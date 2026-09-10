@@ -1,0 +1,328 @@
+name: Build Mullvad iOS 16 (ipa)
+
+on:
+  push:
+    branches: [ios16-fork]
+  workflow_dispatch:
+
+jobs:
+  build-ios16:
+    name: Build & Sign iOS 16 IPA
+    runs-on: macos-14
+    timeout-minutes: 90
+
+    steps:
+      - name: 🟢 Step 1 - Checkout (with submodules) — START
+        run: echo "Checkout repository and submodules..."
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: 🔍 Step 2 - Env diagnostics — START
+        run: |
+          set -euo pipefail
+          echo "=== Runner diagnostics ==="
+          echo "Runner OS: $(sw_vers)"
+          echo "Xcode path: $(xcode-select -p)"
+          xcodebuild -version || { echo "❌ xcodebuild not found"; exit 1; }
+          xcrun --version || true
+          echo "Rust toolchain:"
+          rustc --version 2>&1 || echo "rustc not found yet"
+          cargo --version 2>&1 || echo "cargo not found yet"
+          echo "Go:"
+          go version 2>&1 || echo "go not found yet"
+          protoc --version 2>&1 || echo "protoc not found yet"
+          brew --version 2>&1 | head -n 1 || true
+          echo "✅ Diagnostics done"
+
+      - name: 🛠 Step 3 - Select Xcode version — START
+        run: |
+          set -euo pipefail
+          echo "Selecting suitable Xcode..."
+          # macos-14 image includes Xcode 15.4 and 16.x. We need Xcode 15.4+ for iOS 16/17 builds with Rust.
+          # Try to prefer Xcode 15.4 if available, otherwise keep default.
+          if [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+            echo "→ Using Xcode 15.4"
+          elif [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+            echo "→ Using Xcode 16.4"
+          else
+            echo "→ Using default Xcode at $(xcode-select -p)"
+          fi
+          xcodebuild -version
+          echo "✅ Xcode selection done (requires verification on first CI run — see summary block)"
+
+      - name: 📦 Step 4 - Install dependencies (Rust, Go, protobuf, ripgrep) — START
+        run: |
+          set -euo pipefail
+          echo "Installing dependencies via brew + rustup..."
+          brew update || echo "brew update failed, continuing"
+          # Go (1.21+), protobuf, ripgrep — already partly on runner, ensure latest
+          brew install go protobuf ripgrep || brew upgrade go protobuf ripgrep || true
+          go version
+          protoc --version
+          rg --version || true
+
+          # Rust via rustup
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "Installing rustup..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup --version
+          rustup toolchain list
+          # Ensure stable is installed and set as default
+          rustup update stable || rustup toolchain install stable
+          rustup default stable
+
+          # Install iOS targets via repo script (reads rust-toolchain.toml)
+          echo "Running scripts/setup-rust ios (installs iOS targets)..."
+          chmod +x scripts/setup-rust 2>/dev/null || true
+          if [ -f "scripts/setup-rust" ]; then
+            ./scripts/setup-rust ios || {
+              echo "⚠️ scripts/setup-rust failed, trying manual rustup targets..."
+              rustup target add aarch64-apple-ios aarch64-apple-ios-sim || true
+            }
+          else
+            echo "⚠️ scripts/setup-rust not found, adding targets manually"
+            rustup target add aarch64-apple-ios aarch64-apple-ios-sim || true
+          fi
+          rustup target list --installed
+          echo "✅ Dependencies installed"
+
+      - name: 🔧 Step 5 - Configure Xcode project (xcconfigs) — START
+        run: |
+          set -euo pipefail
+          echo "Copying Xcode config templates if missing..."
+          for file in ios/Configurations/*.template; do
+            target="${file//.template/}"
+            if [ ! -f "$target" ]; then
+              echo "→ Copy $file -> $target"
+              cp "$file" "$target"
+            else
+              echo "→ Exists $target (keep)"
+            fi
+          done
+          ls -l ios/Configurations/
+          # Patch Bundle IDs / team if needed via secrets? We keep template CKG9MXH72F team,
+          # but allow override via APPLE_TEAM_ID secret below. For now template team stays.
+          echo "✅ Xcode configs ready (requires verification first CI run for manual signing)"
+
+      - name: 🔐 Step 6 - Import signing certificate & provisioning profiles — START
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_PROVISION_PROFILE_BASE64_PACKETTUNNEL: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64_PACKETTUNNEL }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          echo "=== Import signing assets ==="
+          if [ -z "${BUILD_CERTIFICATE_BASE64:-}" ]; then
+            echo "❌ BUILD_CERTIFICATE_BASE64 secret is empty/missing"
+            echo "→ Create it: base64 -i Certificates.p12 | pbcopy  (or see summary block)"
+            exit 1
+          fi
+          if [ -z "${BUILD_PROVISION_PROFILE_BASE64:-}" ]; then
+            echo "❌ BUILD_PROVISION_PROFILE_BASE64 secret is empty/missing"
+            exit 1
+          fi
+          if [ -z "${P12_PASSWORD:-}" ]; then
+            echo "❌ P12_PASSWORD secret is empty/missing"
+            exit 1
+          fi
+          : "${KEYCHAIN_PASSWORD:=mullvad-ci-keychain}"
+          echo "Keychain password length: ${#KEYCHAIN_PASSWORD}"
+
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          PP2_PATH="$RUNNER_TEMP/profile_packet.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "→ Decoding P12..."
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH" || { echo "❌ Failed to decode P12 base64"; exit 1; }
+
+          echo "→ Decoding provisioning profile (main)..."
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH" || { echo "❌ Failed to decode provisioning profile"; exit 1; }
+
+          if [ -n "${BUILD_PROVISION_PROFILE_BASE64_PACKETTUNNEL:-}" ]; then
+            echo "→ Decoding PacketTunnel provisioning profile..."
+            echo -n "$BUILD_PROVISION_PROFILE_BASE64_PACKETTUNNEL" | base64 --decode -o "$PP2_PATH" || { echo "❌ Failed to decode PacketTunnel profile"; exit 1; }
+          else
+            echo "⚠️ BUILD_PROVISION_PROFILE_BASE64_PACKETTUNNEL not set — assuming single profile covers both targets (requires verification)"
+            # For manual signing with two bundle IDs we ideally need 2 profiles. Fallback: copy same file for detection.
+            cp "$PP_PATH" "$PP2_PATH"
+          fi
+
+          echo "→ Creating keychain..."
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "→ Importing certificate..."
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH" || { echo "❌ security import failed"; exit 1; }
+          security list-keychain -d user -s "$KEYCHAIN_PATH" "$(security list-keychains -d user | tr -d '"')"
+
+          # Allow codesign without prompt
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
+
+          echo "→ Installing provisioning profiles..."
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          for pp in "$PP_PATH" "$PP2_PATH"; do
+            UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< $(security cms -D -i "$pp" 2>/dev/null) 2>/dev/null || security cms -D -i "$pp" | grep -aA1 UUID | grep -o "[-A-Za-z0-9]\{36\}" | head -n1)
+            if [ -z "$UUID" ]; then
+              # Fallback uuid extraction
+              UUID=$(security cms -D -i "$pp" | plutil -p - 2>/dev/null | grep UUID | grep -o "[-A-Za-z0-9]\{36\}" | head -n1 || true)
+            fi
+            if [ -z "$UUID" ]; then
+              echo "❌ Could not extract UUID from provisioning profile $pp"
+              security cms -D -i "$pp" | head -n 20 || true
+              exit 1
+            fi
+            echo "→ $pp UUID=$UUID"
+            cp "$pp" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID.mobileprovision"
+          done
+          ls -l ~/Library/MobileDevice/Provisioning\ Profiles/
+
+          echo "→ Installed identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
+
+          if [ -n "${APPLE_TEAM_ID:-}" ]; then
+            echo "APPLE_TEAM_ID provided: ${APPLE_TEAM_ID} (will be used in ExportOptions)"
+          else
+            echo "⚠️ APPLE_TEAM_ID not set — using team from profile/pbxproj (verify)"
+          fi
+
+          echo "✅ Signing assets imported"
+
+      - name: 🏗 Step 7 - Build Rust + WireGuard + Archive — START
+        run: |
+          set -euo pipefail
+          echo "=== Building iOS archive (this will also build Rust via build-rust-library.sh) ==="
+          # Ensure cargo in PATH for Xcode build phases
+          export PATH="$HOME/.cargo/bin:$PATH"
+          # Make sure go is in PATH for wireguard-apple build
+          export PATH="/opt/homebrew/opt/go/bin:/opt/homebrew/bin:$PATH"
+
+          # Create ExportOptions_adHoc.plist for ad-hoc/development signing (overrides app-store default)
+          cat > "$RUNNER_TEMP/ExportOptions_adHoc.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>teamID</key>
+            <string>__TEAM_ID__</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>net.mullvad.MullvadVPN</key>
+              <string>__PP_MAIN_NAME__</string>
+              <key>net.mullvad.MullvadVPN.PacketTunnel</key>
+              <string>__PP_PT_NAME__</string>
+            </dict>
+            <key>compileBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+
+          # Extract provisioning profile names and team IDs
+          PP_MAIN="$RUNNER_TEMP/profile.mobileprovision"
+          PP_PT="$RUNNER_TEMP/profile_packet.mobileprovision"
+          get_pp_name() { security cms -D -i "$1" | plutil -p - 2>/dev/null | grep '"Name"' | sed -E 's/.*=> "(.*)"/\1/' | head -n1; }
+          get_pp_team() { security cms -D -i "$1" | plutil -p - 2>/dev/null | grep '"TeamIdentifier"' -A2 | grep -o '"[A-Z0-9]\{10\}"' | tr -d '"' | head -n1; }
+
+          # Fallback via grep if plutil fails
+          PP_MAIN_NAME=$(security cms -D -i "$PP_MAIN" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+          PP_PT_NAME=$(security cms -D -i "$PP_PT" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+          if [ -z "$PP_MAIN_NAME" ]; then PP_MAIN_NAME="Mullvad VPN AdHoc"; fi
+          if [ -z "$PP_PT_NAME" ]; then PP_PT_NAME="Packet Tunnel AdHoc"; fi
+          echo "Provisioning profile names: main='$PP_MAIN_NAME' pt='$PP_PT_NAME'"
+
+          TEAM_FROM_PP=$(security cms -D -i "$PP_MAIN" | grep -a '<key>TeamIdentifier</key>' -A2 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+          if [ -n "${APPLE_TEAM_ID:-}" ]; then TEAM_ID="$APPLE_TEAM_ID"; elif [ -n "$TEAM_FROM_PP" ]; then TEAM_ID="$TEAM_FROM_PP"; else TEAM_ID="CKG9MXH72F"; fi
+          echo "Team ID: $TEAM_ID"
+
+          sed -i '' "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+          sed -i '' "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+          sed -i '' "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+
+          cat "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+
+          # Archive
+          echo "→ xcodebuild archive (Release)..."
+          # Use manual signing, allow provisioning updates
+          xcodebuild \
+            -project ios/MullvadVPN.xcodeproj \
+            -scheme MullvadVPN \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
+              echo "❌ xcodebuild archive failed — tail of log:"
+              tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
+              exit 1
+            }
+          echo "✅ Archive succeeded: $RUNNER_TEMP/MullvadVPN.xcarchive"
+          ls -lh "$RUNNER_TEMP/MullvadVPN.xcarchive" | head -n 20
+
+      - name: 📤 Step 8 - Export IPA — START
+        run: |
+          set -euo pipefail
+          echo "=== Exporting IPA ==="
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions_adHoc.plist" \
+            -exportPath "$RUNNER_TEMP/ipa_output" \
+            -allowProvisioningUpdates 2>&1 | tee "$RUNNER_TEMP/xcodebuild-export.log" || {
+              echo "❌ xcodebuild -exportArchive failed"
+              tail -n 200 "$RUNNER_TEMP/xcodebuild-export.log"
+              exit 1
+            }
+          echo "✅ Export done"
+          ls -R "$RUNNER_TEMP/ipa_output" | head -n 100
+          IPA_PATH=$(find "$RUNNER_TEMP/ipa_output" -name "*.ipa" | head -n1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "❌ No .ipa found after export"
+            find "$RUNNER_TEMP" -type f | head -n 30
+            exit 1
+          fi
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+          echo "IPA found: $IPA_PATH"
+          ls -lh "$IPA_PATH"
+          # Copy to workspace for artifact upload
+          mkdir -p build
+          cp "$IPA_PATH" build/MullvadVPN-iOS16.ipa
+          ls -lh build/
+          echo "✅ IPA ready for artifact"
+
+      - name: 📦 Step 9 - Upload IPA artifact — START
+        uses: actions/upload-artifact@v4
+        with:
+          name: MullvadVPN-iOS16-ipa
+          path: build/MullvadVPN-iOS16.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 🔑 Step 10 - Cleanup keychain — if: always()
+        run: |
+          set -euo pipefail
+          echo "Cleaning up keychain..."
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+          echo "✅ Cleanup done"
+
