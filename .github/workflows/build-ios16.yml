@@ -362,7 +362,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: 🔑 Step 10 - Cleanup keychain — if: always()
+      - name: 🔑 Step 10 - Cleanup keychain
+        if: always()
         run: |
           set -euo pipefail
           echo "Cleaning up keychain..."
