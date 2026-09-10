@@ -108,7 +108,7 @@ struct OneToMany: MultihopDecisionFlow {
             relay: entryMatch,
             from: exitCandidates,
             obfuscation: nil,
-            forceV4Address: true,
+            forceV4Address: true
         )
 
         return SelectedRelays(
@@ -157,7 +157,7 @@ struct ManyToOne: MultihopDecisionFlow {
         let exitMatch = try multihopPicker.findBestMatch(
             from: exitCandidates,
             obfuscation: nil,
-            forceV4Address: true,
+            forceV4Address: true
         )
         let entryMatch = try multihopPicker.exclude(
             relay: exitMatch,

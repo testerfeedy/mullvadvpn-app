@@ -52,7 +52,7 @@ public struct TunnelAdapterConfiguration {
     func asTunnelSettings() -> TunnelInterfaceSettings {
         return TunnelInterfaceSettings(
             interfaceAddresses: self.interfaceAddresses,
-            dns: self.dns,
+            dns: self.dns
         )
     }
 }

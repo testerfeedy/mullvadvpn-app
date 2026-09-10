@@ -241,7 +241,7 @@ class CustomListLocationNode: LocationNode, @unchecked Sendable {
             parent: parent,
             children: [],
             showsChildren: showsChildren,
-            customList: customList,
+            customList: customList
         )
 
         node.children = recursivelyCopyChildren(withParent: node)

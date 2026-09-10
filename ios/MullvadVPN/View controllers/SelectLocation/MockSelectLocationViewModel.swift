@@ -94,7 +94,7 @@ class MockSelectLocationViewModel: SelectLocationViewModel {
                             children: [
                                 LocationNode(
                                     name: "Stockholm",
-                                    code: "sth",
+                                    code: "sth"
                                 ),
                                 LocationNode(
                                     name: "Gothenburg", code: "got",
@@ -136,7 +136,7 @@ class MockSelectLocationViewModel: SelectLocationViewModel {
                     ]),
                 LocationNode(
                     name: "Stockholm",
-                    code: "sth",
+                    code: "sth"
                 ),
             ],
             filter: [

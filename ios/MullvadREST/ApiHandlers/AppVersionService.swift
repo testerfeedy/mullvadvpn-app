@@ -31,7 +31,7 @@ public final class AppVersionService: @unchecked Sendable {
     public init(
         urlSession: URLSessionProtocol,
         appPreferences: AppPreferences,
-        mainAppBundleIdentifier: String,
+        mainAppBundleIdentifier: String
     ) {
         self.urlSession = urlSession
         self.appPreferences = appPreferences

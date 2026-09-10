@@ -126,7 +126,7 @@ class LocationCoordinator: Coordinator, Presentable, Presenting {
             navigationController: InterceptibleNavigationController(),
             interactor: selectLocationViewModel,
             tunnelManager: tunnelManager,
-            nodes: nodes,
+            nodes: nodes
         )
 
         coordinator.didFinish = { [weak self] listCustomListCoordinator, action in

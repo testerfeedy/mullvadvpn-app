@@ -96,7 +96,7 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
 
         LocationsListView(
             locations: $context.locations,
-            multihopContext: viewModel.multihopContext,
+            multihopContext: viewModel.multihopContext
         ) { location in
             if viewModel.filtersWillBeOverridden(location) {
                 multihopWarningAlert = getMultihopFilterOverrideWarningAlert(node: location)
@@ -170,7 +170,7 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
         }
         LocationsListView(
             locations: $context.customLists,
-            multihopContext: viewModel.multihopContext,
+            multihopContext: viewModel.multihopContext
         ) { location in
             context.selectLocation(location)
         } contextMenu: { location in

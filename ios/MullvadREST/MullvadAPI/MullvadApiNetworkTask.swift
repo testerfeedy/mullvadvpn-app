@@ -28,7 +28,7 @@ extension REST {
             name: String,
             request: APIRequest,
             transportProvider: APITransportProviderProtocol,
-            responseHandler: some RESTRustResponseHandler<Success>,
+            responseHandler: some RESTRustResponseHandler<Success>
         ) {
             self.request = request
             self.transportProvider = transportProvider

@@ -612,7 +612,7 @@ public actor GotaTunActor: PacketTunnelActorProtocol {
             lastKeyRotation: lastKeyRotation,
             isPostQuantum: config.isPostQuantum,
             isDaitaEnabled: config.isDaitaEnabled,
-            obfuscationMethod: selectedRelays.obfuscation,
+            obfuscationMethod: selectedRelays.obfuscation
         )
     }
 

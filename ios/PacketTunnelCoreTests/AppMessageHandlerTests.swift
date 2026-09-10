@@ -118,7 +118,7 @@ final class AppMessageHandlerTests: XCTestCase {
                 isIPOverridden: false,
                 features: nil
             ),
-            retryAttempt: 0,
+            retryAttempt: 0
         )
 
         _ = try? await appMessageHandler.handleAppMessage(

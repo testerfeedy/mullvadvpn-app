@@ -50,7 +50,7 @@ final actor StorePaymentManagerInteractor {
         return await withCheckedContinuation { continuation in
             _ = apiProxy.initStoreKitPayment(
                 accountNumber: accountNumber,
-                retryStrategy: .noRetry,
+                retryStrategy: .noRetry
             ) { result in
                 continuation.resume(returning: result)
             }
@@ -61,7 +61,7 @@ final actor StorePaymentManagerInteractor {
         await withCheckedContinuation { continuation in
             _ = apiProxy.checkStoreKitPayment(
                 transaction: StoreKitTransaction(transaction: jwsRepresentation),
-                retryStrategy: .purchaseReceiptUpload,
+                retryStrategy: .purchaseReceiptUpload
             ) { result in
                 continuation.resume(returning: result)
             }

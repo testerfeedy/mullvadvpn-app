@@ -76,7 +76,7 @@ struct LocationListItem<ContextMenu>: View where ContextMenu: View {
                             multihopContext: multihopContext,
                             onSelect: onSelect,
                             contextMenu: { location in contextMenu(location) },
-                            level: level + 1,
+                            level: level + 1
                         )
                     }
                 }

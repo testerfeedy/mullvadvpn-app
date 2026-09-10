@@ -17,7 +17,7 @@ extension UIStackView {
         alignment: UIStackView.Alignment = .fill,
         distribution: UIStackView.Distribution = .fill,
         isLayoutMarginsRelativeArrangement: Bool = false,
-        spacing: CGFloat = 0.0,
+        spacing: CGFloat = 0.0
     ) {
         self.init()
         self.axis = axis

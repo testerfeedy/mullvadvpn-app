@@ -40,7 +40,7 @@ class EditCustomListCoordinator: Coordinator, Presentable, Presenting {
         navigationController: UINavigationController,
         customListInteractor: CustomListInteractorProtocol,
         customList: CustomList,
-        nodes: [LocationNode],
+        nodes: [LocationNode]
     ) {
         self.navigationController = navigationController
         self.customListInteractor = customListInteractor

@@ -295,7 +295,7 @@ extension IncludeAllNetworksSettingsViewModel {
             message.insert(
                 String(
                     format: NSLocalizedString("This will also disable “%@“.", comment: ""),
-                    NSLocalizedString("Local Network Sharing", comment: ""),
+                    NSLocalizedString("Local Network Sharing", comment: "")
                 ),
                 at: 1
             )

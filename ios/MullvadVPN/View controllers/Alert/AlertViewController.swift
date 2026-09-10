@@ -290,7 +290,7 @@ class AlertViewController: UIViewController {
         style: AlertActionStyle,
         accessibilityId: AccessibilityIdentifier?,
         handler: Handler? = nil,
-        interactiveHandler: InteractiveHandler? = nil,
+        interactiveHandler: InteractiveHandler? = nil
     ) {
         let button = AppButton(style: style.buttonStyle)
         button.setTitle(title, for: .normal)

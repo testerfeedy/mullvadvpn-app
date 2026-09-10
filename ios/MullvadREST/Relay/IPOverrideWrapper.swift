@@ -34,7 +34,7 @@ public final class IPOverrideWrapper: RelayCacheProtocol {
         return CachedRelays(
             etag: prebundledRelays.etag,
             relays: relayResponse,
-            updatedAt: prebundledRelays.updatedAt,
+            updatedAt: prebundledRelays.updatedAt
         )
     }
 

@@ -132,7 +132,7 @@ extension LoginView {
                         action: {
                             viewModel.login()
                         }
-                    ),
+                    )
                 )
             )
             .accessibilityIdentifier(.loginTextField)
@@ -184,7 +184,7 @@ extension LoginView {
                     handler: {
                         viewModel.createAccount()
                         alert = nil
-                    },
+                    }
                 ),
                 .init(
                     type: .secondary,

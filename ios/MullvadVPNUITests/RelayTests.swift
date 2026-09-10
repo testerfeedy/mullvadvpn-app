@@ -277,7 +277,7 @@ class RelayTests: LoggedInWithTimeUITestCase {
 
             try generateTrafficAndDisconnect(
                 from: connectedToIPAddress,
-                searchForPort: expectedPort,
+                searchForPort: expectedPort
             )
 
             destinationAddress = connectedToIPAddress

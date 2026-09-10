@@ -116,9 +116,9 @@ struct VPNSettingsView: View {
                         },
                         trailing: {
                             itemFactory.trailing(for: .drillDown(title: ""))
-                        },
+                        }
                     )
-                },
+                }
             )
             .padding(.leading, UIMetrics.contentInsets.left)
             .padding(.trailing, UIMetrics.contentInsets.right)

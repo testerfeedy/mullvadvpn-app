@@ -1070,7 +1070,7 @@ final class ApplicationCoordinator: Coordinator, Presenting, @preconcurrency Roo
                     title:
                         String(
                             format: NSLocalizedString("Disable “%@”", comment: ""),
-                            NSLocalizedString("Force all apps", comment: ""),
+                            NSLocalizedString("Force all apps", comment: "")
                         ),
                     style: .default,
                     interactiveHandler: { [weak self] alertViewController, button in

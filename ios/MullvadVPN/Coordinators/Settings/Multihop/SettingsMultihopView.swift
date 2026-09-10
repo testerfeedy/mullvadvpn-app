@@ -71,17 +71,17 @@ struct SettingsMultihopView: View {
                         image: .multihopIllustrationGeneral
                     )
                     SettingsInfoPageView(
-                        image: .multihopIllustrationWhenNeeded,
+                        image: .multihopIllustrationWhenNeeded
                     ) {
                         WhenNeededPage()
                     }
                     SettingsInfoPageView(
-                        image: .multihopIllustrationAlways,
+                        image: .multihopIllustrationAlways
                     ) {
                         AlwaysPage()
                     }
                     SettingsInfoPageView(
-                        image: .multihopIllustrationNever,
+                        image: .multihopIllustrationNever
                     ) {
                         NeverPage()
                     }

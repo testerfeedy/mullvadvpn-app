@@ -46,7 +46,7 @@ extension ConnectionView {
                 text: viewModel.localizedTitleForSelectLocationButton,
                 style: .primary,
                 mainAccessibilityIdentifier: .selectLocationButton,
-                trailingAccessory: reloadButton,
+                trailingAccessory: reloadButton
             ) { action?(.selectLocation) }
         }
 

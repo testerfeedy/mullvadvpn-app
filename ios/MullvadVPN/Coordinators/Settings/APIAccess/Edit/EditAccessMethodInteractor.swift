@@ -31,7 +31,7 @@ struct EditAccessMethodInteractor: EditAccessMethodInteractorProtocol {
     init(
         subject: CurrentValueSubject<AccessMethodViewModel, Never>,
         repository: AccessMethodRepositoryProtocol,
-        proxyConfigurationTester: ProxyConfigurationTesterProtocol,
+        proxyConfigurationTester: ProxyConfigurationTesterProtocol
     ) {
         self.subject = subject
         self.repository = repository

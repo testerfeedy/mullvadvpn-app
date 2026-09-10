@@ -378,7 +378,7 @@ class RelayPickingTests: XCTestCase {
         let port = try XCTUnwrap(portsOutsideDefaultRange.randomElement())
 
         let constraints = RelayConstraints(
-            exitLocations: .only(UserSelectedRelays(locations: [.hostname("se", "got", "se3-wireguard")])),
+            exitLocations: .only(UserSelectedRelays(locations: [.hostname("se", "got", "se3-wireguard")]))
         )
 
         var settings = LatestTunnelSettings()

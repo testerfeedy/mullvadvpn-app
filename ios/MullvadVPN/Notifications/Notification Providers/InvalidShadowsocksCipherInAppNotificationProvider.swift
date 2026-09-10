@@ -50,7 +50,7 @@ final class InvalidShadowsocksCipherInAppNotificationProvider: NotificationProvi
             style: .warning,
             title: NSLocalizedString("CUSTOM API ACCESS METHOD IS INVALID", comment: ""),
             body: string,
-            tapAction: createTapAction(),
+            tapAction: createTapAction()
         )
     }
 

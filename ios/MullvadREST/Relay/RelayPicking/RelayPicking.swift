@@ -26,7 +26,7 @@ extension RelayPicking {
         from candidates: [RelayWithLocation<REST.ServerRelay>],
         closeTo location: Location? = nil,
         obfuscation: RelayObfuscation?,
-        forceV4Address: Bool = false,
+        forceV4Address: Bool = false
     ) throws -> SelectedRelay {
         let match = try RelaySelector.WireGuard.pickCandidate(
             from: candidates,
@@ -41,7 +41,7 @@ extension RelayPicking {
         let socketAddress = try resolveSocketAddress(
             match: match,
             obfuscation: obfuscation,
-            forceV4: forceV4Address,
+            forceV4: forceV4Address
         )
 
         // Convert WireGuardObfuscationState to ObfuscationMethod
@@ -55,7 +55,7 @@ extension RelayPicking {
             ipv4Gateway: match.endpoint.ipv4Gateway,
             ipv6Gateway: match.endpoint.ipv6Gateway,
             publicKey: match.endpoint.publicKey,
-            obfuscation: obfuscationMethod,
+            obfuscation: obfuscationMethod
         )
 
         return SelectedRelay(
@@ -72,7 +72,7 @@ extension RelayPicking {
     private func resolveSocketAddress(
         match: RelaySelectorMatch,
         obfuscation: RelayObfuscation?,
-        forceV4: Bool,
+        forceV4: Bool
     ) throws -> AnyIPEndpoint {
         // Try IPv6 first if preferred and available
         if tunnelSettings.ipVersion.isIPv6, !forceV4 {

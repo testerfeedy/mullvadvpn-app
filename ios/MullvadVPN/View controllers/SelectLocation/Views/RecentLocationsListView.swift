@@ -22,7 +22,7 @@ struct RecentLocationsListView<ContextMenu>: View where ContextMenu: View {
                 location: location,
                 multihopContext: multihopContext,
                 onSelect: onSelectLocation,
-                contextMenu: { location in contextMenu(location) },
+                contextMenu: { location in contextMenu(location) }
             )
         }
     }
