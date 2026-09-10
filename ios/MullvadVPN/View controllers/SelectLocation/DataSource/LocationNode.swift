@@ -11,19 +11,19 @@
 import MullvadSettings
 import MullvadTypes
 
-@Observable
-class LocationNode: @unchecked Sendable {
+// IOS16-PATCH: @Observable требует iOS 17. На iOS 16 заменён на ObservableObject + @Published (теряется автоматический tracking, но UI остаётся рабочим — ручной objectWillChange).
+class LocationNode: ObservableObject, @unchecked Sendable {
     let name: String
-    var code: String
-    var locations: [RelayLocation]
-    var isActive: Bool
+    @Published var code: String
+    @Published var locations: [RelayLocation]
+    @Published var isActive: Bool
     weak var parent: LocationNode?
-    var children: [LocationNode]
-    var showsChildren: Bool
-    var isConnected: Bool
-    var isSelected: Bool
-    var isExcluded: Bool
-    var isOverridden: Bool
+    @Published var children: [LocationNode]
+    @Published var showsChildren: Bool
+    @Published var isConnected: Bool
+    @Published var isSelected: Bool
+    @Published var isExcluded: Bool
+    @Published var isOverridden: Bool
 
     var id: String {
         [String(describing: type(of: self)), code].joined(separator: "_")

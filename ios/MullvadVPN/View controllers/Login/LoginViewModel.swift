@@ -19,8 +19,9 @@ protocol LoginViewModelProviding {
 }
 extension TunnelManager: LoginViewModelProviding {}
 
+// IOS16-PATCH: @Observable требует iOS 17. На iOS 16 заменён на ObservableObject + @Published.
 @MainActor
-@Observable class LoginViewModel {
+class LoginViewModel: ObservableObject {
     enum State {
         case `default`
         case authenticating(Action)
@@ -33,7 +34,7 @@ extension TunnelManager: LoginViewModelProviding {}
         case createAccount
     }
 
-    var accountNumber: String = "" {
+    @Published var accountNumber: String = "" {
         willSet {
             switch loginState {
             case .failure, .authenticating:
@@ -46,7 +47,7 @@ extension TunnelManager: LoginViewModelProviding {}
         }
     }
 
-    var storedAccountNumber: [String] = [] {
+    @Published var storedAccountNumber: [String] = [] {
         didSet {
             if storedAccountNumber.isEmpty {
                 interactor.removeLastUsedAccount()
@@ -54,8 +55,8 @@ extension TunnelManager: LoginViewModelProviding {}
         }
     }
 
-    var loginState: State
-    var showAccessMethodInvalidView: Bool = false
+    @Published var loginState: State
+    @Published var showAccessMethodInvalidView: Bool = false
 
     var didFinishLogin: ((Action, Error?) -> Void)?
     var navigateToAccessMethods: (() -> Void)?

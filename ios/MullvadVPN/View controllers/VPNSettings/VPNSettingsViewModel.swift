@@ -12,9 +12,9 @@ import MullvadSettings
 import MullvadTypes
 import UIKit
 
-@Observable
-public class ObservableVPNSettings: @unchecked Sendable {
-    var tunnelSettings: LatestTunnelSettings
+// IOS16-PATCH: @Observable / Observation framework доступен только с iOS 17. Для iOS 16 заменён на ObservableObject + @Published.
+public class ObservableVPNSettings: ObservableObject, @unchecked Sendable {
+    @Published var tunnelSettings: LatestTunnelSettings
 
     init(tunnelSettings: LatestTunnelSettings = LatestTunnelSettings()) {
         self.tunnelSettings = tunnelSettings

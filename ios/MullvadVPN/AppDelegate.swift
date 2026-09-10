@@ -212,11 +212,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         addApplicationNotifications(application: application)
         startInitialization(application: application)
 
-        // Pre-warm @Observable infrastructure for LocationNode to avoid first-render lag
-        // in SelectLocationView. SwiftUI's observation system has initialization overhead
-        // that is cached after first use.
-        DispatchQueue.global(qos: .userInitiated).async {
-            _ = LocationNode(name: "", code: "")
+        // IOS16-PATCH: Pre-warm для @Observable (iOS 17) отключён на iOS 16 — там используется ObservableObject.
+        // На iOS 17 оставляем оптимизацию, на iOS 16 это не нужно.
+        if #available(iOS 17, *) {
+            // Pre-warm @Observable infrastructure for LocationNode to avoid first-render lag
+            // in SelectLocationView. SwiftUI's observation system has initialization overhead
+            // that is cached after first use.
+            DispatchQueue.global(qos: .userInitiated).async {
+                _ = LocationNode(name: "", code: "")
+            }
         }
 
         return true
