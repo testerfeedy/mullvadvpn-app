@@ -212,8 +212,26 @@ jobs:
           # Make sure go is in PATH for wireguard-apple build
           export PATH="/opt/homebrew/opt/go/bin:/opt/homebrew/bin:$PATH"
 
-          # Create ExportOptions_adHoc.plist for ad-hoc/development signing (overrides app-store default)
-          cat > "$RUNNER_TEMP/ExportOptions_adHoc.plist" <<'PLIST'
+          # Archive (подписанный или неподписанный)
+          if [ "${SIGNING_ENABLED:-false}" = "false" ]; then
+            echo "→ xcodebuild archive (Release) UNSIGNED — CODE_SIGNING_ALLOWED=NO (для бесплатного Apple ID)"
+            xcodebuild \
+              -project ios/MullvadVPN.xcodeproj \
+              -scheme MullvadVPN \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
+                echo "❌ xcodebuild archive (unsigned) failed — tail of log:"
+                tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
+                exit 1
+              }
+          else
+            # Create ExportOptions_adHoc.plist for ad-hoc signing (only when signing enabled)
+            cat > "$RUNNER_TEMP/ExportOptions_adHoc.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -238,48 +256,21 @@ jobs:
           </dict>
           </plist>
           PLIST
-
-          # Extract provisioning profile names and team IDs
-          PP_MAIN="$RUNNER_TEMP/profile.mobileprovision"
-          PP_PT="$RUNNER_TEMP/profile_packet.mobileprovision"
-          get_pp_name() { security cms -D -i "$1" | plutil -p - 2>/dev/null | grep '"Name"' | sed -E 's/.*=> "(.*)"/\1/' | head -n1; }
-          get_pp_team() { security cms -D -i "$1" | plutil -p - 2>/dev/null | grep '"TeamIdentifier"' -A2 | grep -o '"[A-Z0-9]\{10\}"' | tr -d '"' | head -n1; }
-
-          # Fallback via grep if plutil fails
-          PP_MAIN_NAME=$(security cms -D -i "$PP_MAIN" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
-          PP_PT_NAME=$(security cms -D -i "$PP_PT" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
-          if [ -z "$PP_MAIN_NAME" ]; then PP_MAIN_NAME="Mullvad VPN AdHoc"; fi
-          if [ -z "$PP_PT_NAME" ]; then PP_PT_NAME="Packet Tunnel AdHoc"; fi
-          echo "Provisioning profile names: main='$PP_MAIN_NAME' pt='$PP_PT_NAME'"
-
-          TEAM_FROM_PP=$(security cms -D -i "$PP_MAIN" | grep -a '<key>TeamIdentifier</key>' -A2 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
-          if [ -n "${APPLE_TEAM_ID:-}" ]; then TEAM_ID="$APPLE_TEAM_ID"; elif [ -n "$TEAM_FROM_PP" ]; then TEAM_ID="$TEAM_FROM_PP"; else TEAM_ID="CKG9MXH72F"; fi
-          echo "Team ID: $TEAM_ID"
-
-          sed -i '' "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
-          sed -i '' "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
-          sed -i '' "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
-
-          cat "$RUNNER_TEMP/ExportOptions_adHoc.plist"
-
-          # Archive (подписанный или неподписанный)
-          if [ "${SIGNING_ENABLED:-false}" = "false" ]; then
-            echo "→ xcodebuild archive (Release) UNSIGNED — CODE_SIGNING_ALLOWED=NO (для бесплатного Apple ID)"
-            xcodebuild \
-              -project ios/MullvadVPN.xcodeproj \
-              -scheme MullvadVPN \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY="" \
-              clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
-                echo "❌ xcodebuild archive (unsigned) failed — tail of log:"
-                tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
-                exit 1
-              }
-          else
+            # Extract provisioning profile names and team IDs
+            PP_MAIN="$RUNNER_TEMP/profile.mobileprovision"
+            PP_PT="$RUNNER_TEMP/profile_packet.mobileprovision"
+            PP_MAIN_NAME=$(security cms -D -i "$PP_MAIN" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+            PP_PT_NAME=$(security cms -D -i "$PP_PT" | grep -a '<key>Name</key>' -A1 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+            if [ -z "$PP_MAIN_NAME" ]; then PP_MAIN_NAME="Mullvad VPN AdHoc"; fi
+            if [ -z "$PP_PT_NAME" ]; then PP_PT_NAME="Packet Tunnel AdHoc"; fi
+            echo "Provisioning profile names: main='$PP_MAIN_NAME' pt='$PP_PT_NAME'"
+            TEAM_FROM_PP=$(security cms -D -i "$PP_MAIN" | grep -a '<key>TeamIdentifier</key>' -A2 | grep string | sed -E 's/.*<string>(.*)<\/string>.*/\1/' | head -n1)
+            if [ -n "${APPLE_TEAM_ID:-}" ]; then TEAM_ID="$APPLE_TEAM_ID"; elif [ -n "$TEAM_FROM_PP" ]; then TEAM_ID="$TEAM_FROM_PP"; else TEAM_ID="CKG9MXH72F"; fi
+            echo "Team ID: $TEAM_ID"
+            sed -i '' "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__TEAM_ID__/$TEAM_ID/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+            sed -i '' "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_MAIN_NAME__/$PP_MAIN_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+            sed -i '' "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist" 2>/dev/null || sed -i "s/__PP_PT_NAME__/$PP_PT_NAME/g" "$RUNNER_TEMP/ExportOptions_adHoc.plist"
+            cat "$RUNNER_TEMP/ExportOptions_adHoc.plist"
             echo "→ xcodebuild archive (Release) SIGNED..."
             xcodebuild \
               -project ios/MullvadVPN.xcodeproj \
