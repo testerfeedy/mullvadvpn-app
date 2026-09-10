@@ -123,10 +123,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Import signing assets ==="
+          # IOS16-PATCH: бесплатный Apple ID — подпись опциональна. Если секретов нет, собираем UNSIGNED IPA для AltStore/Sideloadly.
           if [ -z "${BUILD_CERTIFICATE_BASE64:-}" ]; then
-            echo "❌ BUILD_CERTIFICATE_BASE64 secret is empty/missing"
-            echo "→ Create it: base64 -i Certificates.p12 | pbcopy  (or see summary block)"
-            exit 1
+            echo "⚠️ BUILD_CERTIFICATE_BASE64 secret is empty/missing — building UNSIGNED IPA (free Apple ID + AltStore)"
+            echo "→ Для подписанного ad-hoc IPA добавь секреты из summary (требуется платный Developer Program)"
+            echo "SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
           if [ -z "${BUILD_PROVISION_PROFILE_BASE64:-}" ]; then
             echo "❌ BUILD_PROVISION_PROFILE_BASE64 secret is empty/missing"
@@ -136,6 +138,7 @@ jobs:
             echo "❌ P12_PASSWORD secret is empty/missing"
             exit 1
           fi
+          echo "SIGNING_ENABLED=true" >> "$GITHUB_ENV"
           : "${KEYCHAIN_PASSWORD:=mullvad-ci-keychain}"
           echo "Keychain password length: ${#KEYCHAIN_PASSWORD}"
 
@@ -259,57 +262,97 @@ jobs:
 
           cat "$RUNNER_TEMP/ExportOptions_adHoc.plist"
 
-          # Archive
-          echo "→ xcodebuild archive (Release)..."
-          # Use manual signing, allow provisioning updates
-          xcodebuild \
-            -project ios/MullvadVPN.xcodeproj \
-            -scheme MullvadVPN \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
-              echo "❌ xcodebuild archive failed — tail of log:"
-              tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
-              exit 1
-            }
+          # Archive (подписанный или неподписанный)
+          if [ "${SIGNING_ENABLED:-false}" = "false" ]; then
+            echo "→ xcodebuild archive (Release) UNSIGNED — CODE_SIGNING_ALLOWED=NO (для бесплатного Apple ID)"
+            xcodebuild \
+              -project ios/MullvadVPN.xcodeproj \
+              -scheme MullvadVPN \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
+                echo "❌ xcodebuild archive (unsigned) failed — tail of log:"
+                tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
+                exit 1
+              }
+          else
+            echo "→ xcodebuild archive (Release) SIGNED..."
+            xcodebuild \
+              -project ios/MullvadVPN.xcodeproj \
+              -scheme MullvadVPN \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+              -allowProvisioningUpdates \
+              CODE_SIGN_STYLE=Manual \
+              DEVELOPMENT_TEAM="$TEAM_ID" \
+              CODE_SIGN_IDENTITY="Apple Distribution" \
+              clean archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild-archive.log" || {
+                echo "❌ xcodebuild archive failed — tail of log:"
+                tail -n 200 "$RUNNER_TEMP/xcodebuild-archive.log"
+                exit 1
+              }
+          fi
           echo "✅ Archive succeeded: $RUNNER_TEMP/MullvadVPN.xcarchive"
           ls -lh "$RUNNER_TEMP/MullvadVPN.xcarchive" | head -n 20
 
       - name: 📤 Step 8 - Export IPA — START
         run: |
           set -euo pipefail
-          echo "=== Exporting IPA ==="
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions_adHoc.plist" \
-            -exportPath "$RUNNER_TEMP/ipa_output" \
-            -allowProvisioningUpdates 2>&1 | tee "$RUNNER_TEMP/xcodebuild-export.log" || {
-              echo "❌ xcodebuild -exportArchive failed"
-              tail -n 200 "$RUNNER_TEMP/xcodebuild-export.log"
+          if [ "${SIGNING_ENABLED:-false}" = "false" ]; then
+            echo "=== Exporting UNSIGNED IPA (zip Payload) ==="
+            APP_PATH=$(find "$RUNNER_TEMP/MullvadVPN.xcarchive/Products/Applications" -name "*.app" -type d | head -n1)
+            if [ -z "$APP_PATH" ]; then
+              echo "❌ .app not found in archive"
+              find "$RUNNER_TEMP/MullvadVPN.xcarchive" -type d | head -n 30
               exit 1
-            }
-          echo "✅ Export done"
-          ls -R "$RUNNER_TEMP/ipa_output" | head -n 100
-          IPA_PATH=$(find "$RUNNER_TEMP/ipa_output" -name "*.ipa" | head -n1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "❌ No .ipa found after export"
-            find "$RUNNER_TEMP" -type f | head -n 30
-            exit 1
+            fi
+            echo "App: $APP_PATH"
+            mkdir -p "$RUNNER_TEMP/ipa_output/Payload"
+            cp -R "$APP_PATH" "$RUNNER_TEMP/ipa_output/Payload/"
+            cd "$RUNNER_TEMP/ipa_output"
+            zip -r MullvadVPN-iOS16-unsigned.ipa Payload >/dev/null
+            IPA_PATH="$RUNNER_TEMP/ipa_output/MullvadVPN-iOS16-unsigned.ipa"
+            echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+            ls -lh "$IPA_PATH"
+            mkdir -p "$GITHUB_WORKSPACE/build"
+            cp "$IPA_PATH" "$GITHUB_WORKSPACE/build/MullvadVPN-iOS16-unsigned.ipa"
+            # Для совместимости artifact всегда называется MullvadVPN-iOS16.ipa (unsigned)
+            cp "$IPA_PATH" "$GITHUB_WORKSPACE/build/MullvadVPN-iOS16.ipa"
+            ls -lh "$GITHUB_WORKSPACE/build/"
+            echo "✅ UNSIGNED IPA ready — подпиши через AltStore/Sideloadly своим Apple ID (бесплатно, 7 дней)"
+          else
+            echo "=== Exporting SIGNED IPA ==="
+            xcodebuild \
+              -exportArchive \
+              -archivePath "$RUNNER_TEMP/MullvadVPN.xcarchive" \
+              -exportOptionsPlist "$RUNNER_TEMP/ExportOptions_adHoc.plist" \
+              -exportPath "$RUNNER_TEMP/ipa_output" \
+              -allowProvisioningUpdates 2>&1 | tee "$RUNNER_TEMP/xcodebuild-export.log" || {
+                echo "❌ xcodebuild -exportArchive failed"
+                tail -n 200 "$RUNNER_TEMP/xcodebuild-export.log"
+                exit 1
+              }
+            echo "✅ Export done"
+            ls -R "$RUNNER_TEMP/ipa_output" | head -n 100
+            IPA_PATH=$(find "$RUNNER_TEMP/ipa_output" -name "*.ipa" | head -n1)
+            if [ -z "$IPA_PATH" ]; then
+              echo "❌ No .ipa found after export"
+              find "$RUNNER_TEMP" -type f | head -n 30
+              exit 1
+            fi
+            echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+            echo "IPA found: $IPA_PATH"
+            ls -lh "$IPA_PATH"
+            mkdir -p build
+            cp "$IPA_PATH" build/MullvadVPN-iOS16.ipa
+            ls -lh build/
+            echo "✅ SIGNED IPA ready for artifact"
           fi
-          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
-          echo "IPA found: $IPA_PATH"
-          ls -lh "$IPA_PATH"
-          # Copy to workspace for artifact upload
-          mkdir -p build
-          cp "$IPA_PATH" build/MullvadVPN-iOS16.ipa
-          ls -lh build/
-          echo "✅ IPA ready for artifact"
 
       - name: 📦 Step 9 - Upload IPA artifact — START
         uses: actions/upload-artifact@v4
