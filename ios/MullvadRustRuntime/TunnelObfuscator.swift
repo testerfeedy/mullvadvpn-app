@@ -70,7 +70,7 @@ public final class TunnelObfuscator: TunnelObfuscation {
     public init(
         remoteAddress: IPAddress,
         remotePort: UInt16,
-        obfuscationProtocol: TunnelObfuscationProtocol,
+        obfuscationProtocol: TunnelObfuscationProtocol
     ) {
         self.remoteAddress = remoteAddress
         self.port = remotePort
