@@ -13,16 +13,22 @@ import SwiftUI
 // this is necessart because .move(edge. .top) propagates down to subsidiary views and
 // contaminates their own transitions.
 
-struct TopSlideTransition: Transition {
-    func body(content: Content, phase: TransitionPhase) -> some View {
-        let progress = phase.isIdentity ? 1.0 : 0.0
-        content
-            .visualEffect { content, proxy in
-                content.offset(x: 0.0, y: -(proxy.size.height * (1 - progress)))
-            }
+// IOS16-PATCH: TransitionPhase and visualEffect are iOS 17 APIs.
+private struct TopSlideModifier: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        GeometryReader { proxy in
+            content.offset(y: isActive ? -proxy.size.height : 0)
+        }
     }
 }
 
 extension AnyTransition {
-    public static var topSlide: AnyTransition { .init(TopSlideTransition()) }
+    public static var topSlide: AnyTransition {
+        .modifier(
+            active: TopSlideModifier(isActive: true),
+            identity: TopSlideModifier(isActive: false)
+        )
+    }
 }

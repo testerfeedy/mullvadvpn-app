@@ -148,7 +148,8 @@ struct ConfigurableTextField: View {
             "",
             text: $text,
             prompt: Text(placeholder)
-                .foregroundStyle(appearance.placeholderColor)
+                // IOS16-PATCH: Use the iOS 16 color modifier for the placeholder.
+                .foregroundColor(appearance.placeholderColor)
         )
         .frame(maxWidth: .infinity)
         .keyboardType(configuration.keyboardType)
@@ -165,7 +166,7 @@ struct ConfigurableTextField: View {
         }
         .onChange(
             of: text,
-            { _, newValue in
+            { newValue in
                 if let formatter = configuration.formatter {
                     let formatted = formatter.format(newValue)
                     if formatted != newValue {

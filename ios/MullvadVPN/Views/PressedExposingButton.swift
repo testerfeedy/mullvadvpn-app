@@ -14,7 +14,8 @@ struct PressedExposingButton<Content: View>: View {
 
         func makeBody(configuration: Configuration) -> some View {
             configuration.label
-                .onChange(of: configuration.isPressed) {
+                // IOS16-PATCH: the old onChange API receives the new value.
+                .onChange(of: configuration.isPressed) { _ in
                     if !disabled {
                         onPressedChange?(configuration.isPressed)
                     }

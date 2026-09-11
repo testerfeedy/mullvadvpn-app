@@ -47,8 +47,11 @@ struct LwoObfuscationSettingsView: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var port = WireGuardObfuscationLwoPort.automatic
     let model = MockLwoObfuscationSettingsViewModel(port: $port)
     LwoObfuscationSettingsView(viewModel: model)
 }
+#endif

@@ -67,6 +67,8 @@ private struct FrameModifier: ViewModifier {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: sizeThatFitsLayout is an iOS 17 preview API; keep this preview out of Release archives.
 #Preview("ResizableBannerView", traits: .sizeThatFitsLayout) {
     VStack(spacing: 0) {
         ResizableImageView(image: .mullvadIconInfo, dimension: .width(48))
@@ -77,3 +79,4 @@ private struct FrameModifier: ViewModifier {
     }
     .background(Color.gray.opacity(0.2))
 }
+#endif

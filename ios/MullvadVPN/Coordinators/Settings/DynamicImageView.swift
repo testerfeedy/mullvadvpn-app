@@ -17,14 +17,19 @@ class DynamicImageView: UIImageView {
         self.baseSize = baseSize
         self.textStyle = textStyle
         super.init(image: image)
-        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
-            (self: Self, previousTraitCollection: UITraitCollection) in
-            self.invalidateIntrinsicContentSize()
-        }
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    // IOS16-PATCH: registerForTraitChanges(_:handler:) is available only from iOS 17.
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else {
+            return
+        }
+        invalidateIntrinsicContentSize()
     }
 
     override var intrinsicContentSize: CGSize {

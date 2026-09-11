@@ -44,7 +44,7 @@ struct TermsOfServiceView: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            scrollableContent.scrollBounceBehavior(.basedOnSize)
+            scrollableContent.ios16ScrollBounceBasedOnSize()
             HStack {
                 Text(
                     LocalizedStringKey(

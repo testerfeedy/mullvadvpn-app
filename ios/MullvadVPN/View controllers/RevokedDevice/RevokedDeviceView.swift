@@ -42,7 +42,8 @@ struct RevokedDeviceView: View {
                 }
                 .padding(.top, 24)
             }
-            .scrollBounceBehavior(.automatic)
+            // IOS16-PATCH: scrollBounceBehavior is available only from iOS 16.4.
+            .ios16ScrollBounceAutomatic()
             MullvadButton(
                 text: "Go to login", style: viewModel.tunnelState.isSecured ? .destructive : .primary
             ) {

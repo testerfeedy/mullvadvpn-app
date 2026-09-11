@@ -55,7 +55,9 @@ struct MullvadNoticeView: View {
         ZStack {
             ScrollView {
                 ZStack {
-                    Spacer().containerRelativeFrame([.horizontal, .vertical])
+                    // IOS16-PATCH: containerRelativeFrame(_:alignment:) is available only from iOS 17.
+                    Spacer()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     VStack(spacing: 0) {
                         Spacer()
                         StateView(state: viewModel.style)

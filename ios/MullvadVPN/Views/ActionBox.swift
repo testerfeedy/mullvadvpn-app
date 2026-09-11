@@ -89,7 +89,7 @@ struct ActionBox: View {
                 .cornerRadius(UIMetrics.ActionBox.cornerRadius)
             }
         }
-        .geometryGroup()
+        .ios16GeometryGroup()
         .padding(8)
         .background(Color.mullvadBackground)
         .cornerRadius(UIMetrics.ActionBox.cornerRadius)
@@ -100,6 +100,8 @@ struct ActionBox: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var isChecked: Bool = false
     VStack {
@@ -126,3 +128,4 @@ struct ActionBox: View {
     .padding()
     .background(Color.mullvadBackground)
 }
+#endif

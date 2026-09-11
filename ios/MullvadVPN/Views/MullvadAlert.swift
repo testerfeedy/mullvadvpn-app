@@ -143,7 +143,8 @@ struct AlertModifier: ViewModifier {
                 scrollViewHeight = size.height
             }
         }
-        .contentMargins(0, for: .scrollContent)
+        // IOS16-PATCH: contentMargins(_:for:) is available only from iOS 17; zero padding is the iOS 16 default.
+        .padding(.zero)
         .frame(maxHeight: scrollViewHeight)
     }
 

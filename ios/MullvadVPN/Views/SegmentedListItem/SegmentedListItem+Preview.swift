@@ -11,6 +11,8 @@
 import MullvadSettings
 import SwiftUI
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview("Settings") {
     @Previewable @State var inputText: String = ""
     @Previewable @State var toggleState: Bool = false
@@ -331,3 +333,4 @@ import SwiftUI
     }
     .background(Color.mullvadBackground)
 }
+#endif

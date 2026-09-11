@@ -48,8 +48,11 @@ struct WireGuardPortSettingsView: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var port = WireGuardPort.automatic
     let model = WireGuardPortSettingsViewModelStub(port: $port)
     WireGuardPortSettingsView(viewModel: model, options: [.automatic, .port51820, .port53])
 }
+#endif

@@ -169,9 +169,10 @@ struct MultihopSelectionView: View {
                     .padding(.horizontal, outerPadding + 8 + 2)
                 }
             }
-            .geometryGroup()
+            .ios16GeometryGroup()
         }
-        .coordinateSpace(.multihopSelection)
+        // IOS16-PATCH: iOS 16 uses the string-based coordinateSpace(name:) API.
+        .coordinateSpace(name: "mullvad.multihopSelection")
         .overlay(alignment: .topLeading) {
             LineOverlayView(
                 iconPositions: filteredIconPositions,
@@ -179,11 +180,13 @@ struct MultihopSelectionView: View {
             )
             .animation(nil, value: hops.count)
         }
-        .geometryGroup()
+        .ios16GeometryGroup()
         .animation(.default, value: hops.count)
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var selectedContext: MultihopContext = .exit
     @Previewable @State var isExpanded: Bool = true
@@ -260,3 +263,4 @@ struct MultihopSelectionView: View {
     }
     .background(Color.mullvadDarkBackground)
 }
+#endif

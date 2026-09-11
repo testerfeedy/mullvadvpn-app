@@ -75,9 +75,10 @@ struct NotificationSettingsView<ViewModel>: View where ViewModel: NotificationSe
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             viewModel.checkNotificationPermission()
         }
+        // IOS16-PATCH: the old onChange API receives only the new value.
         .onChange(
             of: viewModel.settings,
-            {
+            { _ in
                 didUpdateNotificationSettings?(viewModel.settings)
             })
     }

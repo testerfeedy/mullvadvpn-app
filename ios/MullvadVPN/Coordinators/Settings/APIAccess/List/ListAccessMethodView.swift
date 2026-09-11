@@ -84,7 +84,7 @@ struct ListAccessMethodView<ViewModel>: View where ViewModel: ListAccessViewMode
             .accessibilityIdentifier(
                 AccessibilityIdentifier.apiAccessListView.asString
             )
-            .scrollBounceBehavior(.basedOnSize)
+            .ios16ScrollBounceBasedOnSize()
             Spacer()
         }
         .background(Color.mullvadBackground)

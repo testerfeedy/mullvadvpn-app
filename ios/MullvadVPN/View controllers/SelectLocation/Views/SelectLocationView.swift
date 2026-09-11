@@ -91,7 +91,8 @@ struct SelectLocationView<ViewModel>: View where ViewModel: SelectLocationViewMo
                                 }
                             }
                         )
-                        .contentMargins(.bottom, showSearchField ? floatingBarHeight + listBottomInset : 0)
+                        // IOS16-PATCH: contentMargins(_:for:) is available only from iOS 17.
+                        .padding(.bottom, showSearchField ? floatingBarHeight + listBottomInset : 0)
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 case .entry:
@@ -114,7 +115,8 @@ struct SelectLocationView<ViewModel>: View where ViewModel: SelectLocationViewMo
                                 }
                             }
                         )
-                        .contentMargins(.bottom, showSearchField ? floatingBarHeight + listBottomInset : 0)
+                        // IOS16-PATCH: contentMargins(_:for:) is available only from iOS 17.
+                        .padding(.bottom, showSearchField ? floatingBarHeight + listBottomInset : 0)
                     }
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 }
@@ -149,20 +151,16 @@ struct SelectLocationView<ViewModel>: View where ViewModel: SelectLocationViewMo
         .background(Color.mullvadDarkBackground)
         .navigationTitle("Select location")
         .navigationBarTitleDisplayMode(.inline)
+        // IOS16-PATCH: Use explicit ToolbarItem trailing closures to avoid iOS 16 overload ambiguity.
         .toolbar {
-            ToolbarItem(
-                placement: .topBarTrailing,
-                content: {
-                    Button("Done") {
-                        viewModel.didFinish()
-                    }
-                    .foregroundStyle(Color.mullvadTextPrimary)
-                    .accessibilityIdentifier(.closeSelectLocationButton)
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    viewModel.didFinish()
                 }
-            )
-            ToolbarItem(
-                placement: .topBarLeading,
-                content: {
+                .foregroundStyle(Color.mullvadTextPrimary)
+                .accessibilityIdentifier(.closeSelectLocationButton)
+            }
+            ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Picker(
                             selection: Binding(
@@ -229,7 +227,6 @@ struct SelectLocationView<ViewModel>: View where ViewModel: SelectLocationViewMo
                             .accessibilityIdentifier(.selectLocationToolbarMenu)
                     }
                 }
-            )
         }
         .mullvadAlert(item: $disablingRecentConnectionsAlert)
         .mullvadAlert(item: $multihopWarningAlert)

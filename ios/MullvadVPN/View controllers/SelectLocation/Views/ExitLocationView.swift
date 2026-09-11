@@ -67,7 +67,8 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
             }
             .environment(\.defaultMinListRowHeight, 0)
             .listStyle(.plain)
-            .coordinateSpace(.exitLocationScroll)
+            // IOS16-PATCH: iOS 16 uses the string-based coordinateSpace(name:) API.
+            .coordinateSpace(name: "mullvad.exitLocationScroll")
             .onAppear {
                 scrollToCurrentSelection(scrollProxy)
             }
@@ -232,6 +233,8 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var viewModel = MockSelectLocationViewModel()
     ExitLocationView(
@@ -255,3 +258,4 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
     )
     .background(Color.mullvadBackground)
 }
+#endif

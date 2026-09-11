@@ -174,6 +174,8 @@ struct SegmentedListItem<Leading: View>: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var inputText: String = ""
     @Previewable @State var toggleState: Bool = false
@@ -206,6 +208,7 @@ struct SegmentedListItem<Leading: View>: View {
     }
     .background(Color.mullvadBackground)
 }
+#endif
 
 // MARK: - Nesting
 

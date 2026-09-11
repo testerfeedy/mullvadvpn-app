@@ -2,16 +2,7 @@ import SwiftUI
 
 @MainActor
 extension CoordinateSpace {
-    static let multihopSelection: CoordinateSpace = NamedCoordinateSpace.multihopSelection.coordinateSpace
-    static let exitLocationScroll: CoordinateSpace = NamedCoordinateSpace.exitLocationScroll.coordinateSpace
-}
-
-@MainActor
-extension NamedCoordinateSpace {
-    static let multihopSelection: NamedCoordinateSpace = .named(
-        UUID()
-    )
-    static let exitLocationScroll: NamedCoordinateSpace = .named(
-        UUID()
-    )
+    // IOS16-PATCH: NamedCoordinateSpace and .coordinateSpace(_:) are iOS 17 APIs.
+    static let multihopSelection: CoordinateSpace = .named("mullvad.multihopSelection")
+    static let exitLocationScroll: CoordinateSpace = .named("mullvad.exitLocationScroll")
 }

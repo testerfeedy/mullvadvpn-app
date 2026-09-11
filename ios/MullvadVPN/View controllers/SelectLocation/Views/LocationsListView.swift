@@ -19,6 +19,8 @@ struct LocationsListView<ContextMenu>: View where ContextMenu: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @StateObject var viewModel = MockSelectLocationViewModel()
     ScrollView {
@@ -39,3 +41,4 @@ struct LocationsListView<ContextMenu>: View where ContextMenu: View {
         viewModel.exitContext.recents.insert(AutomaticLocationNode(), at: 0)
     }
 }
+#endif

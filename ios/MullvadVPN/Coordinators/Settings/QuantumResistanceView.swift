@@ -63,7 +63,10 @@ struct QuantumResistanceView: View {
     }
 }
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview {
     @Previewable @State var quantumResistance = false
     QuantumResistanceView(isQuantumResistanceEnabled: $quantumResistance)
 }
+#endif

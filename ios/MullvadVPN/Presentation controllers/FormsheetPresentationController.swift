@@ -77,12 +77,15 @@ class FormSheetPresentationController: UIPresentationController {
         self.options = options
         super.init(presentedViewController: presentedViewController, presenting: presentingViewController)
         addKeyboardResponderIfNeeded()
+    }
 
-        registerForTraitChanges(
-            [UITraitUserInterfaceStyle.self],
-            handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-                self.postFullscreenPresentationWillChangeIfNeeded()
-            })
+    // IOS16-PATCH: registerForTraitChanges(_:handler:) is available only from iOS 17.
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else {
+            return
+        }
+        postFullscreenPresentationWillChangeIfNeeded()
     }
 
     override var frameOfPresentedViewInContainerView: CGRect {

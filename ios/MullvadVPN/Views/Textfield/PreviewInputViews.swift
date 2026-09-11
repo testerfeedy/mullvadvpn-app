@@ -9,6 +9,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import SwiftUI
 
+#if DEBUG
+// IOS16-PATCH: Previewable is an iOS 17 preview-only API; keep previews out of Release archives.
 #Preview("Input views") {
 
     @Previewable
@@ -85,6 +87,7 @@ import SwiftUI
     .padding()
     .background(Color.mullvadBackground)
 }
+#endif
 
 private struct PreviewTextField: View {
     let placeholder: String

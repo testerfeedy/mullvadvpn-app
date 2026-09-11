@@ -11,6 +11,36 @@
 import SwiftUI
 
 extension View {
+    // IOS16-PATCH: These modifiers were introduced after the minimum deployment target.
+    @ViewBuilder
+    func ios16ScrollBounceBasedOnSize() -> some View {
+        if #available(iOS 16.4, *) {
+            scrollBounceBehavior(.basedOnSize)
+        } else {
+            self
+        }
+    }
+
+    // IOS16-PATCH: Keep the automatic bounce behavior on iOS 16.4 and later.
+    @ViewBuilder
+    func ios16ScrollBounceAutomatic() -> some View {
+        if #available(iOS 16.4, *) {
+            scrollBounceBehavior(.automatic)
+        } else {
+            self
+        }
+    }
+
+    // IOS16-PATCH: Keep the iOS 17 geometry optimization when available, otherwise preserve layout.
+    @ViewBuilder
+    func ios16GeometryGroup() -> some View {
+        if #available(iOS 17.0, *) {
+            geometryGroup()
+        } else {
+            self
+        }
+    }
+
     /**
       A view modifier that can be used to conditionally apply other view modifiers.
      */

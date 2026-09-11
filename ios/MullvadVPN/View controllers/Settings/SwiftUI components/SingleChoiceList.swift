@@ -278,7 +278,8 @@ struct SingleChoiceList<Value>: View where Value: Equatable {
                     )
             )
             .focused($customValueIsFocused)
-            .onChange(of: customValueInput) {
+            // IOS16-PATCH: the old onChange API receives the new value.
+            .onChange(of: customValueInput) { _ in
                 if let maxInputLength {
                     if customValueInput.count > maxInputLength {
                         customValueInput = String(customValueInput.prefix(maxInputLength))

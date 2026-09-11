@@ -89,7 +89,7 @@ struct ConnectionView: View {
                             }
                     }
                     .frame(maxHeight: scrollViewHeight)
-                    .scrollBounceBehavior(.basedOnSize)
+                    .ios16ScrollBounceBasedOnSize()
                 }
                 .transformEffect(.identity)
                 .animation(.default, value: hasFeatureIndicators)
@@ -99,7 +99,8 @@ struct ConnectionView: View {
             .background(BlurView(style: .dark))
             .cornerRadius(12)
             .padding(EdgeInsets(top: 16, leading: 16, bottom: 24, trailing: 16))
-            .onChange(of: connectionViewModel.showsConnectionDetails) {
+            // IOS16-PATCH: the old onChange API receives the new value.
+            .onChange(of: connectionViewModel.showsConnectionDetails) { _ in
                 if !connectionViewModel.showsConnectionDetails {
                     withAnimation {
                         isExpanded = false
