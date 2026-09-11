@@ -164,17 +164,14 @@ struct ConfigurableTextField: View {
         .onSubmit {
             configuration.submitConfiguration?.action()
         }
-        .onChange(
-            of: text,
-            { newValue in
-                if let formatter = configuration.formatter {
-                    let formatted = formatter.format(newValue)
-                    if formatted != newValue {
-                        text = formatted
-                    }
+        .onChange(of: text) { newValue in
+            if let formatter = configuration.formatter {
+                let formatted = formatter.format(newValue)
+                if formatted != newValue {
+                    text = formatted
                 }
             }
-        )
+        }
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 

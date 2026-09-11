@@ -118,11 +118,9 @@ private struct MullvadListButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             // IOS16-PATCH: the old onChange API receives the new value.
-            .onChange(
-                of: configuration.isPressed,
-                { _ in
-                    onButtonPressedChange(configuration.isPressed)
-                })
+            .onChange(of: configuration.isPressed) { _ in
+                onButtonPressedChange(configuration.isPressed)
+            }
     }
 }
 

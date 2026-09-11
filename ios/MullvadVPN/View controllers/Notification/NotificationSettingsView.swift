@@ -76,11 +76,9 @@ struct NotificationSettingsView<ViewModel>: View where ViewModel: NotificationSe
             viewModel.checkNotificationPermission()
         }
         // IOS16-PATCH: the old onChange API receives only the new value.
-        .onChange(
-            of: viewModel.settings,
-            { _ in
-                didUpdateNotificationSettings?(viewModel.settings)
-            })
+        .onChange(of: viewModel.settings) { _ in
+            didUpdateNotificationSettings?(viewModel.settings)
+        }
     }
 }
 
