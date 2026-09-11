@@ -23,7 +23,18 @@ enum ApplicationConfiguration {
 
     /// Container URL for security group.
     static var containerURL: URL {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: securityGroupIdentifier)!
+        if let sharedContainerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: securityGroupIdentifier
+        ) {
+            return sharedContainerURL
+        }
+
+        // IOS16-PATCH: TrollStore/free signing may not preserve the App Group entitlement.
+        // Use a private container instead of crashing at launch; app and tunnel storage will not be shared.
+        let fallbackURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory.appendingPathComponent("MullvadVPN", isDirectory: true)
+        try? FileManager.default.createDirectory(at: fallbackURL, withIntermediateDirectories: true)
+        return fallbackURL
     }
 
     /// Returns URL for new log file associated with application target and located within the specified container.
