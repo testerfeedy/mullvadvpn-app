@@ -42,34 +42,65 @@ public actor GotaTunPathObserver: GotaTunPathObserverProtocol {
     ) async -> Network.NWPath.Status {
         if let startedStatus { return startedStatus }
 
-        var iterator = pathMonitor.makeAsyncIterator()
-        let currentStatus = await iterator.next()?.status ?? .unsatisfied
-        startedStatus = currentStatus
+        // IOS16-PATCH: makeAsyncIterator() для NWPathMonitor доступен только с iOS 17 в extension.
+        // На iOS 16 используем pathUpdateHandler fallback без удаления логики debounce.
+        if #available(iOS 17, *) {
+            var iterator = pathMonitor.makeAsyncIterator()
+            let currentStatus = await iterator.next()?.status ?? .unsatisfied
+            startedStatus = currentStatus
 
-        observation = Task { [iterator] in
-            var iterator = iterator
+            observation = Task { [iterator] in
+                var iterator = iterator
+                var pendingLoss: Task<Void, Never>?
+                defer { pendingLoss?.cancel() }
+
+                while let status = await iterator.next()?.status {
+                    pendingLoss?.cancel()
+                    pendingLoss = nil
+
+                    // Losing a path should be debounced - .satisfied updates need not be debounced. This swallows spurious losses in connectivity.
+                    guard status == .unsatisfied else {
+                        body(status)
+                        continue
+                    }
+
+                    pendingLoss = Task {
+                        try? await Task.sleep(for: Self.pathUpdateDebounceDelay)
+                        guard !Task.isCancelled else { return }
+                        body(status)
+                    }
+                }
+            }
+
+            return currentStatus
+        } else {
+            // Fallback для iOS 16: используем pathUpdateHandler (доступен с iOS 12)
+            let currentStatus = pathMonitor.currentPath.status
+            startedStatus = currentStatus
+
             var pendingLoss: Task<Void, Never>?
-            defer { pendingLoss?.cancel() }
-
-            while let status = await iterator.next()?.status {
+            pathMonitor.pathUpdateHandler = { path in
+                let status = path.status
                 pendingLoss?.cancel()
                 pendingLoss = nil
-
-                // Losing a path should be debounced - .satisfied updates need not be debounced. This swallows spurious losses in connectivity.
                 guard status == .unsatisfied else {
                     body(status)
-                    continue
+                    return
                 }
-
                 pendingLoss = Task {
                     try? await Task.sleep(for: Self.pathUpdateDebounceDelay)
                     guard !Task.isCancelled else { return }
                     body(status)
                 }
             }
+            pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
+            // Сохраняем task чтобы при stop() отменить
+            observation = Task {
+                // Держим observation живым до отмены; реальная работа в handler
+                try? await Task.sleep(for: .seconds(100*365*24*3600))
+            }
+            return currentStatus
         }
-
-        return currentStatus
     }
 
     public func stop() {
