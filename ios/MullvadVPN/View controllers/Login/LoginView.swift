@@ -63,7 +63,8 @@ extension LoginView {
                 .frame(width: activityIconHeight, height: activityIconHeight)
                 .offset(y: -(activityIconHeight + 32))  // Height + spacing
         }
-        .onChange(of: viewModel.showButtons) { _, newValue in
+        // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+        .onChange(of: viewModel.showButtons) { newValue in
             animateButtonContainer(to: newValue)
         }
     }

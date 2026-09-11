@@ -114,12 +114,13 @@ struct ConfigurableTextField: View {
             dropdownView
             messageView
         }
-        .onChange(of: suggestions) { _, newSuggestions in
+        // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+        .onChange(of: suggestions) { newSuggestions in
             withAnimation(.easeInOut(duration: 0.2)) {
                 animatedSuggestions = newSuggestions
             }
         }
-        .onChange(of: message != nil) { _, hasMessage in
+        .onChange(of: message != nil) { hasMessage in
             withAnimation(.easeInOut(duration: 0.2)) {
                 animatedMessage = hasMessage ? message : nil
             }

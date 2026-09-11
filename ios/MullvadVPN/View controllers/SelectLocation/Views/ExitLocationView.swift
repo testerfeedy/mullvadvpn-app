@@ -71,7 +71,8 @@ struct ExitLocationView<ViewModel: SelectLocationViewModel>: View {
             .onAppear {
                 scrollToCurrentSelection(scrollProxy)
             }
-            .onChange(of: viewModel.searchText) { oldValue, newValue in
+            // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+            .onChange(of: viewModel.searchText) { _ in
                 scrollToCurrentSelection(scrollProxy)
             }
         }

@@ -83,7 +83,8 @@ struct FloatingSearchBar: View {
                 .accessibilityIdentifier(.selectLocationSearchTextField)
             }
         }
-        .onChange(of: isExpanded) { _, expanded in
+        // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+        .onChange(of: isExpanded) { expanded in
             if expanded {
                 isFocused.wrappedValue = true
             }

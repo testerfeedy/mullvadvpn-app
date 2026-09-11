@@ -65,12 +65,11 @@ struct NotificationPromptView<ViewModel>: View where ViewModel: NotificationProm
             .onAppear(perform: {
                 viewModel.checkNotificationPermission()
             })
-            .onChange(of: viewModel.isNotificationsAllowed) { oldValue, newValue in
-                guard oldValue != newValue else { return }
+            // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+            .onChange(of: viewModel.isNotificationsAllowed) { newValue in
                 self.didConclude?(newValue)
             }
-            .onChange(of: viewModel.isSkipped) { oldValue, newValue in
-                guard oldValue != newValue else { return }
+            .onChange(of: viewModel.isSkipped) { _ in
                 self.didConclude?(false)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in

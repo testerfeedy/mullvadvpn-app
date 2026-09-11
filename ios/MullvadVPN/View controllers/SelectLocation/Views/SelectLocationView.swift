@@ -139,7 +139,8 @@ struct SelectLocationView<ViewModel>: View where ViewModel: SelectLocationViewMo
             .sizeOfView { floatingBarHeight = $0.height }
             .accessibilitySortPriority(1)
         }
-        .onChange(of: showSearchField) { _, newValue in
+        // IOS16-PATCH: двухпараметровый onChange доступен только с iOS 17.
+        .onChange(of: showSearchField) { newValue in
             if !newValue {
                 isSearchExpanded = false
                 viewModel.searchText = ""
