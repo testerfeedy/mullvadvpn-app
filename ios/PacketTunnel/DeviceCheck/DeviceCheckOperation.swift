@@ -16,6 +16,26 @@ import MullvadTypes
 import Operations
 import PacketTunnelCore
 
+// IOS16-PATCH: Swift 6 rejects mutable local results captured by both Task and DispatchGroup callbacks.
+private final class LockedValue<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+
+    func read() -> Value {
+        lock.withLock { value }
+    }
+
+    func write(_ value: Value) {
+        lock.withLock {
+            self.value = value
+        }
+    }
+}
+
 /**
  An operation that is responsible for performing account and device diagnostics and key rotation from within packet
  tunnel process.
@@ -131,27 +151,27 @@ final class DeviceCheckOperation: ResultOperation<DeviceCheck>, @unchecked Senda
         accountNumber: String, deviceIdentifier: String,
         completion: @escaping (Result<Account, Error>, Result<Device, Error>) -> Void
     ) {
-        nonisolated(unsafe) var accountResult: Result<Account, Error> = .failure(OperationError.cancelled)
-        nonisolated(unsafe) var deviceResult: Result<Device, Error> = .failure(OperationError.cancelled)
+        let accountResult = LockedValue<Result<Account, Error>>(.failure(OperationError.cancelled))
+        let deviceResult = LockedValue<Result<Device, Error>>(.failure(OperationError.cancelled))
 
         let dispatchGroup = DispatchGroup()
 
         dispatchGroup.enter()
         let accountTask = Task {
-            accountResult = await remoteService.getAccountData(accountNumber: accountNumber)
+            accountResult.write(await remoteService.getAccountData(accountNumber: accountNumber))
             dispatchGroup.leave()
         }
 
         dispatchGroup.enter()
         let deviceTask = remoteService.getDevice(accountNumber: accountNumber, identifier: deviceIdentifier) { result in
-            deviceResult = result
+            deviceResult.write(result)
             dispatchGroup.leave()
         }
 
         tasks.append(contentsOf: [accountTask.cancellable, deviceTask])
 
         dispatchGroup.notify(queue: dispatchQueue) {
-            completion(accountResult, deviceResult)
+            completion(accountResult.read(), deviceResult.read())
         }
     }
 
