@@ -40,7 +40,14 @@ final public class KeychainSettingsStore: SettingsStore, Sendable {
         }
         query[kSecValueData] = data
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            // IOS16-PATCH: ad-hoc/TrollStore-подпись не имеет keychain access group,
+            // повторяем запись в приватный keychain вместо потери настроек (вылет из аккаунта).
+            var fallbackQuery = createDefaultAttributes(item: item)
+            fallbackQuery[kSecValueData] = data
+            status = SecItemAdd(fallbackQuery as CFDictionary, nil)
+        }
         if status != errSecSuccess {
             throw KeychainError(code: status)
         }
