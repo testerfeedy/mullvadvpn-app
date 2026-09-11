@@ -74,31 +74,38 @@ public actor GotaTunPathObserver: GotaTunPathObserverProtocol {
 
             return currentStatus
         } else {
-            // Fallback для iOS 16: используем pathUpdateHandler (доступен с iOS 12)
+            // Fallback для iOS 16: используем AsyncStream поверх pathUpdateHandler (без нарушения Sendable в Swift 6)
             let currentStatus = pathMonitor.currentPath.status
             startedStatus = currentStatus
 
-            var pendingLoss: Task<Void, Never>?
-            pathMonitor.pathUpdateHandler = { path in
-                let status = path.status
-                pendingLoss?.cancel()
-                pendingLoss = nil
-                guard status == .unsatisfied else {
-                    body(status)
-                    return
+            let stream = AsyncStream<Network.NWPath.Status> { continuation in
+                pathMonitor.pathUpdateHandler = { path in
+                    continuation.yield(path.status)
                 }
-                pendingLoss = Task {
-                    try? await Task.sleep(for: Self.pathUpdateDebounceDelay)
-                    guard !Task.isCancelled else { return }
-                    body(status)
-                }
+                pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
             }
-            pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
-            // Сохраняем task чтобы при stop() отменить
+
             observation = Task {
-                // Держим observation живым до отмены; реальная работа в handler
-                try? await Task.sleep(for: .seconds(100*365*24*3600))
+                var pendingLoss: Task<Void, Never>?
+                defer { pendingLoss?.cancel() }
+
+                for await status in stream {
+                    pendingLoss?.cancel()
+                    pendingLoss = nil
+
+                    guard status == .unsatisfied else {
+                        body(status)
+                        continue
+                    }
+
+                    pendingLoss = Task {
+                        try? await Task.sleep(for: Self.pathUpdateDebounceDelay)
+                        guard !Task.isCancelled else { return }
+                        body(status)
+                    }
+                }
             }
+
             return currentStatus
         }
     }
